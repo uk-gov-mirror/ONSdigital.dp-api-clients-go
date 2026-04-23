@@ -194,11 +194,11 @@ func (c *Client) get(ctx context.Context, authToken, path string) ([]byte, http.
 }
 
 func addAuthHeadersToRequest(req *http.Request, authToken string) {
-	// Service auth tokens dont usually contain `Bearer` already so add it if it is missing
+	// Service auth tokens don't usually contain `Bearer` already, so add it if it is missing
 	if !strings.HasPrefix(authToken, "Bearer ") {
 		authToken = "Bearer " + authToken
 	}
-	// Note: Florence header ("X-Florence-Token") will be depricated in future and only the Authorization header will
+	// Note: Florence header ("X-Florence-Token") will be deprecated in future and only the Authorization header will
 	// then be required
 	dprequest.AddFlorenceHeader(req, authToken)
 	dprequest.AddAuthorizationHeader(req, authToken)
