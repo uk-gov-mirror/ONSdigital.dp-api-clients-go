@@ -92,20 +92,20 @@ func (c *Client) Checker(ctx context.Context, check *health.CheckState) error {
 }
 
 // Get returns a response for the requested uri in zebedee
-func (c *Client) Get(ctx context.Context, userAccessToken, path string) ([]byte, error) {
-	b, _, err := c.get(ctx, userAccessToken, path)
+func (c *Client) Get(ctx context.Context, authToken, path string) ([]byte, error) {
+	b, _, err := c.get(ctx, authToken, path)
 	return b, err
 }
 
 // GetWithHeaders returns a response for the requested uri in zebedee,
 // providing the headers too
-func (c *Client) GetWithHeaders(ctx context.Context, userAccessToken, path string) ([]byte, http.Header, error) {
-	return c.get(ctx, userAccessToken, path)
+func (c *Client) GetWithHeaders(ctx context.Context, authToken, path string) ([]byte, http.Header, error) {
+	return c.get(ctx, authToken, path)
 }
 
 // Put updates a resource in zebedee
-func (c *Client) Put(ctx context.Context, userAccessToken, path string, payload []byte) (*http.Response, error) {
-	resp, err := c.put(ctx, userAccessToken, path, payload)
+func (c *Client) Put(ctx context.Context, authToken, path string, payload []byte) (*http.Response, error) {
+	resp, err := c.put(ctx, authToken, path, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +113,8 @@ func (c *Client) Put(ctx context.Context, userAccessToken, path string, payload 
 }
 
 // Post creates a resource in zebedee
-func (c *Client) Post(ctx context.Context, userAccessToken, path string, payload []byte) ([]byte, http.Header, error) {
-	b, headers, err := c.post(ctx, userAccessToken, path, payload)
+func (c *Client) Post(ctx context.Context, authToken, path string, payload []byte) ([]byte, http.Header, error) {
+	b, headers, err := c.post(ctx, authToken, path, payload)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -124,9 +124,9 @@ func (c *Client) Post(ctx context.Context, userAccessToken, path string, payload
 // GetDatasetLandingPage returns a DatasetLandingPage populated with data
 // from a zebedee response. If an error is returned there is a chance that
 // a partly completed DatasetLandingPage is returned
-func (c *Client) GetDatasetLandingPage(ctx context.Context, userAccessToken, collectionID, lang, path string) (DatasetLandingPage, error) {
+func (c *Client) GetDatasetLandingPage(ctx context.Context, authToken, collectionID, lang, path string) (DatasetLandingPage, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+path)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return DatasetLandingPage{}, err
 	}
@@ -156,7 +156,7 @@ func (c *Client) GetDatasetLandingPage(ctx context.Context, userAccessToken, col
 					<-sem
 					wg.Done()
 				}()
-				t, _ := c.GetPageTitle(ctx, userAccessToken, collectionID, lang, e.URI)
+				t, _ := c.GetPageTitle(ctx, authToken, collectionID, lang, e.URI)
 				element[i].Title = t.Title
 			}(i, e, element)
 		}
@@ -166,14 +166,13 @@ func (c *Client) GetDatasetLandingPage(ctx context.Context, userAccessToken, col
 	return dlp, nil
 }
 
-func (c *Client) get(ctx context.Context, userAccessToken, path string) ([]byte, http.Header, error) {
+func (c *Client) get(ctx context.Context, authToken, path string) ([]byte, http.Header, error) {
 	req, err := http.NewRequest("GET", c.hcCli.URL+path, http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	dprequest.AddFlorenceHeader(req, userAccessToken)
-	dprequest.AddAuthorizationHeader(req, userAccessToken)
+	addAuthHeadersToRequest(req, authToken)
 
 	resp, err := c.hcCli.Client.Do(ctx, req)
 	if err != nil {
@@ -194,16 +193,26 @@ func (c *Client) get(ctx context.Context, userAccessToken, path string) ([]byte,
 	return b, resp.Header, err
 }
 
+func addAuthHeadersToRequest(req *http.Request, authToken string) {
+	// Service auth tokens dont usually contain `Bearer` already so add it if it is missing
+	if !strings.HasPrefix(authToken, "Bearer ") {
+		authToken = "Bearer " + authToken
+	}
+	// Note: Florence header ("X-Florence-Token") will be depricated in future and only the Authorization header will
+	// then be required
+	dprequest.AddFlorenceHeader(req, authToken)
+	dprequest.AddAuthorizationHeader(req, authToken)
+}
+
 // getStream returns an io.ReadCloser for the requested uri in zebedee
 // Caller is responsible for closing the ReadCloser
-func (c *Client) getStream(ctx context.Context, userAccessToken, path string) (io.ReadCloser, http.Header, error) {
+func (c *Client) getStream(ctx context.Context, authToken, path string) (io.ReadCloser, http.Header, error) {
 	req, err := http.NewRequest("GET", c.hcCli.URL+path, http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	dprequest.AddFlorenceHeader(req, userAccessToken)
-	dprequest.AddAuthorizationHeader(req, userAccessToken)
+	addAuthHeadersToRequest(req, authToken)
 
 	resp, err := c.hcCli.Client.Do(ctx, req)
 	if err != nil {
@@ -223,14 +232,13 @@ func (c *Client) getStream(ctx context.Context, userAccessToken, path string) (i
 	return resp.Body, resp.Header, nil
 }
 
-func (c *Client) put(ctx context.Context, userAccessToken, path string, payload []byte) (*http.Response, error) {
+func (c *Client) put(ctx context.Context, authToken, path string, payload []byte) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPut, path, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
 	}
 
-	dprequest.AddFlorenceHeader(req, userAccessToken)
-	dprequest.AddAuthorizationHeader(req, userAccessToken)
+	addAuthHeadersToRequest(req, authToken)
 
 	resp, err := c.hcCli.Client.Do(ctx, req)
 	if err != nil {
@@ -241,14 +249,13 @@ func (c *Client) put(ctx context.Context, userAccessToken, path string, payload 
 	return resp, nil
 }
 
-func (c *Client) post(ctx context.Context, userAccessToken, path string, payload []byte) ([]byte, http.Header, error) {
+func (c *Client) post(ctx context.Context, authToken, path string, payload []byte) ([]byte, http.Header, error) {
 	req, err := http.NewRequest(http.MethodPost, c.hcCli.URL+path, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	dprequest.AddFlorenceHeader(req, userAccessToken)
-	dprequest.AddAuthorizationHeader(req, userAccessToken)
+	addAuthHeadersToRequest(req, authToken)
 
 	resp, err := c.hcCli.Client.Do(ctx, req)
 	if err != nil {
@@ -269,14 +276,13 @@ func (c *Client) post(ctx context.Context, userAccessToken, path string, payload
 	return b, resp.Header, err
 }
 
-func (c *Client) delete(ctx context.Context, userAccessToken, path string) ([]byte, http.Header, error) {
+func (c *Client) delete(ctx context.Context, authToken, path string) ([]byte, http.Header, error) {
 	req, err := http.NewRequest(http.MethodDelete, c.hcCli.URL+path, http.NoBody)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	dprequest.AddFlorenceHeader(req, userAccessToken)
-	dprequest.AddAuthorizationHeader(req, userAccessToken)
+	addAuthHeadersToRequest(req, authToken)
 
 	resp, err := c.hcCli.Client.Do(ctx, req)
 	if err != nil {
@@ -300,8 +306,8 @@ func (c *Client) delete(ctx context.Context, userAccessToken, path string) ([]by
 }
 
 // GetBreadcrumb returns a Breadcrumb
-func (c *Client) GetBreadcrumb(ctx context.Context, userAccessToken, collectionID, lang, uri string) ([]Breadcrumb, error) {
-	b, _, err := c.get(ctx, userAccessToken, "/parents?uri="+uri)
+func (c *Client) GetBreadcrumb(ctx context.Context, authToken, collectionID, lang, uri string) ([]Breadcrumb, error) {
+	b, _, err := c.get(ctx, authToken, "/parents?uri="+uri)
 	if err != nil {
 		return nil, err
 	}
@@ -315,9 +321,9 @@ func (c *Client) GetBreadcrumb(ctx context.Context, userAccessToken, collectionI
 }
 
 // GetDataset returns details about a dataset from zebedee
-func (c *Client) GetDataset(ctx context.Context, userAccessToken, collectionID, lang, uri string) (Dataset, error) {
+func (c *Client) GetDataset(ctx context.Context, authToken, collectionID, lang, uri string) (Dataset, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 
 	if err != nil {
 		return Dataset{}, err
@@ -329,13 +335,13 @@ func (c *Client) GetDataset(ctx context.Context, userAccessToken, collectionID, 
 		return dataset, err
 	}
 
-	return c.appendDatasetFileSizes(ctx, userAccessToken, collectionID, lang, uri, dataset)
+	return c.appendDatasetFileSizes(ctx, authToken, collectionID, lang, uri, dataset)
 }
 
-func (c *Client) appendDatasetFileSizes(ctx context.Context, userAccessToken, collectionID, lang, uri string, dataset Dataset) (Dataset, error) {
+func (c *Client) appendDatasetFileSizes(ctx context.Context, authToken, collectionID, lang, uri string, dataset Dataset) (Dataset, error) {
 	for i, download := range dataset.Downloads {
 		if c.downloadStoredInZebedee(download) {
-			fs, err := c.GetFileSize(ctx, userAccessToken, collectionID, lang, uri+"/"+download.File)
+			fs, err := c.GetFileSize(ctx, authToken, collectionID, lang, uri+"/"+download.File)
 			if err != nil {
 				return dataset, err
 			}
@@ -346,7 +352,7 @@ func (c *Client) appendDatasetFileSizes(ctx context.Context, userAccessToken, co
 
 	for i, supplementaryFile := range dataset.SupplementaryFiles {
 		if c.supplementaryFileStoredInZebedee(supplementaryFile) {
-			fs, err := c.GetFileSize(ctx, userAccessToken, collectionID, lang, uri+"/"+supplementaryFile.File)
+			fs, err := c.GetFileSize(ctx, authToken, collectionID, lang, uri+"/"+supplementaryFile.File)
 			if err != nil {
 				return dataset, err
 			}
@@ -366,9 +372,9 @@ func (c *Client) supplementaryFileStoredInZebedee(supplementaryFile Supplementar
 }
 
 // GetHomepageContent gets the content for the homepage from zebedee
-func (c *Client) GetHomepageContent(ctx context.Context, userAccessToken, collectionID, lang, path string) (HomepageContent, error) {
+func (c *Client) GetHomepageContent(ctx context.Context, authToken, collectionID, lang, path string) (HomepageContent, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+path)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return HomepageContent{}, err
 	}
@@ -382,9 +388,9 @@ func (c *Client) GetHomepageContent(ctx context.Context, userAccessToken, collec
 }
 
 // GetFileSize retrieves a given filesize from zebedee
-func (c *Client) GetFileSize(ctx context.Context, userAccessToken, collectionID, lang, uri string) (FileSize, error) {
+func (c *Client) GetFileSize(ctx context.Context, authToken, collectionID, lang, uri string) (FileSize, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/filesize", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return FileSize{}, err
 	}
@@ -398,9 +404,9 @@ func (c *Client) GetFileSize(ctx context.Context, userAccessToken, collectionID,
 }
 
 // GetPageTitle retrieves a page title from zebedee
-func (c *Client) GetPageTitle(ctx context.Context, userAccessToken, collectionID, lang, uri string) (PageTitle, error) {
+func (c *Client) GetPageTitle(ctx context.Context, authToken, collectionID, lang, uri string) (PageTitle, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri+"&title")
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return PageTitle{}, err
 	}
@@ -414,9 +420,9 @@ func (c *Client) GetPageTitle(ctx context.Context, userAccessToken, collectionID
 }
 
 // GetPageData retrieves data about a given page
-func (c *Client) GetPageData(ctx context.Context, userAccessToken, collectionID, lang, uri string) (PageData, error) {
+func (c *Client) GetPageData(ctx context.Context, authToken, collectionID, lang, uri string) (PageData, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return PageData{}, err
 	}
@@ -430,9 +436,9 @@ func (c *Client) GetPageData(ctx context.Context, userAccessToken, collectionID,
 }
 
 // GetPageDescription retrieves a page description from zebedee
-func (c *Client) GetPageDescription(ctx context.Context, userAccessToken, collectionID, lang, uri string) (PageDescription, error) {
+func (c *Client) GetPageDescription(ctx context.Context, authToken, collectionID, lang, uri string) (PageDescription, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri+"&description")
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return PageDescription{}, err
 	}
@@ -446,9 +452,9 @@ func (c *Client) GetPageDescription(ctx context.Context, userAccessToken, collec
 }
 
 // GetTimeseriesMainFigure retrieves a timeseries main figure from zebedee
-func (c *Client) GetTimeseriesMainFigure(ctx context.Context, userAccessToken, collectionID, lang, uri string) (TimeseriesMainFigure, error) {
+func (c *Client) GetTimeseriesMainFigure(ctx context.Context, authToken, collectionID, lang, uri string) (TimeseriesMainFigure, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 
 	if err != nil {
 		return TimeseriesMainFigure{}, err
@@ -464,7 +470,7 @@ func (c *Client) GetTimeseriesMainFigure(ctx context.Context, userAccessToken, c
 
 // PutDatasetInCollection adds a CMD dataset to a
 // collection in zebedee with the given state
-func (c *Client) PutDatasetInCollection(ctx context.Context, userAccessToken, collectionID, lang, datasetID, state string) error {
+func (c *Client) PutDatasetInCollection(ctx context.Context, authToken, collectionID, lang, datasetID, state string) error {
 	uri := fmt.Sprintf("%s/collections/%s/datasets/%s", c.hcCli.URL, collectionID, datasetID)
 
 	zebedeeState := CollectionState{State: state}
@@ -473,7 +479,7 @@ func (c *Client) PutDatasetInCollection(ctx context.Context, userAccessToken, co
 		return errors.Wrap(err, "error while attempting to marshall version")
 	}
 
-	_, err = c.put(ctx, userAccessToken, uri, payload)
+	_, err = c.put(ctx, authToken, uri, payload)
 	if err != nil {
 		return err
 	}
@@ -483,7 +489,7 @@ func (c *Client) PutDatasetInCollection(ctx context.Context, userAccessToken, co
 
 // PutDatasetVersionInCollection adds a CMD dataseries version
 // to a collection in zebedee with the given state
-func (c *Client) PutDatasetVersionInCollection(ctx context.Context, userAccessToken, collectionID, lang, datasetID, edition, version, state string) error {
+func (c *Client) PutDatasetVersionInCollection(ctx context.Context, authToken, collectionID, lang, datasetID, edition, version, state string) error {
 	uri := fmt.Sprintf("%s/collections/%s/datasets/%s/editions/%s/versions/%s", c.hcCli.URL, collectionID, datasetID, edition, version)
 
 	zebedeeState := CollectionState{State: state}
@@ -492,7 +498,7 @@ func (c *Client) PutDatasetVersionInCollection(ctx context.Context, userAccessTo
 		return errors.Wrap(err, "error while attempting to marshall version")
 	}
 
-	_, err = c.put(ctx, userAccessToken, uri, payload)
+	_, err = c.put(ctx, authToken, uri, payload)
 	if err != nil {
 		return err
 	}
@@ -501,9 +507,9 @@ func (c *Client) PutDatasetVersionInCollection(ctx context.Context, userAccessTo
 }
 
 // GetBulletin retrieves a bulletin from zebedee
-func (c *Client) GetBulletin(ctx context.Context, userAccessToken, collectionID, lang, uri string) (Bulletin, error) {
+func (c *Client) GetBulletin(ctx context.Context, authToken, collectionID, lang, uri string) (Bulletin, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return Bulletin{}, err
 	}
@@ -516,7 +522,7 @@ func (c *Client) GetBulletin(ctx context.Context, userAccessToken, collectionID,
 	if !bulletin.Description.LatestRelease {
 		// Resolve the latest release URI
 		latestUrl := fmt.Sprintf("%s/latest", bulletin.URI[:strings.LastIndex(bulletin.URI, "/")])
-		t, err := c.GetPageTitle(ctx, userAccessToken, collectionID, lang, latestUrl)
+		t, err := c.GetPageTitle(ctx, authToken, collectionID, lang, latestUrl)
 		if err != nil {
 			log.Error(ctx, "error finding latest release URI", err, log.Data{"url": latestUrl})
 			bulletin.LatestReleaseURI = latestUrl
@@ -544,7 +550,7 @@ func (c *Client) GetBulletin(ctx context.Context, userAccessToken, collectionID,
 					<-sem
 					wg.Done()
 				}()
-				t, _ := c.GetPageTitle(ctx, userAccessToken, collectionID, lang, e.URI)
+				t, _ := c.GetPageTitle(ctx, authToken, collectionID, lang, e.URI)
 				element[i].Title = t.Title
 				if t.Edition != "" {
 					element[i].Title += fmt.Sprintf(": %s", t.Edition)
@@ -558,11 +564,11 @@ func (c *Client) GetBulletin(ctx context.Context, userAccessToken, collectionID,
 }
 
 // GetRelease retrieves a release from zebedee
-func (c *Client) GetRelease(ctx context.Context, userAccessToken, collectionID, lang, uri string) (Release, error) {
+func (c *Client) GetRelease(ctx context.Context, authToken, collectionID, lang, uri string) (Release, error) {
 	// Ensure uri starts with /
 	cleanUri := filepath.Clean("/" + uri)
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/data", "uri="+cleanUri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 	if err != nil {
 		return Release{}, err
 	}
@@ -594,7 +600,7 @@ func (c *Client) GetRelease(ctx context.Context, userAccessToken, collectionID, 
 					<-sem
 					wg.Done()
 				}()
-				t, err := c.GetPageDescription(ctx, userAccessToken, collectionID, lang, e.URI)
+				t, err := c.GetPageDescription(ctx, authToken, collectionID, lang, e.URI)
 				if err == nil {
 					element[i].Title = t.Description.Title
 					if t.Description.Edition != "" {
@@ -615,18 +621,18 @@ func (c *Client) GetRelease(ctx context.Context, userAccessToken, collectionID, 
 }
 
 // GetResourceBody returns body of a resource e.g. JSON definition of a table
-func (c *Client) GetResourceBody(ctx context.Context, userAccessToken, collectionID, lang, uri string) ([]byte, error) {
+func (c *Client) GetResourceBody(ctx context.Context, authToken, collectionID, lang, uri string) ([]byte, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/resource", "uri="+uri)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 
 	return b, err
 }
 
 // GetResourceStream returns a ReadCloser for a resource e.g. a file download
 // Caller is responsible for closing the ReadCloser
-func (c *Client) GetResourceStream(ctx context.Context, userAccessToken, collectionID, lang, uri string) (io.ReadCloser, error) {
+func (c *Client) GetResourceStream(ctx context.Context, authToken, collectionID, lang, uri string) (io.ReadCloser, error) {
 	reqURL := c.createRequestURL(ctx, collectionID, lang, "/resource", "uri="+uri)
-	s, _, err := c.getStream(ctx, userAccessToken, reqURL)
+	s, _, err := c.getStream(ctx, authToken, reqURL)
 
 	return s, err
 }

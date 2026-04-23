@@ -178,10 +178,15 @@ func contentDataCollection(w http.ResponseWriter, req *http.Request) {
 }
 
 func checkAccessToken(w http.ResponseWriter, req *http.Request) {
-	serviceAuthToken := req.Header.Get(dprequest.FlorenceHeaderKey)
-	if serviceAuthToken != testAccessToken {
+	florenceToken := req.Header.Get(dprequest.FlorenceHeaderKey)
+	if florenceToken != "Bearer "+testAccessToken {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("401 - No access token header set!"))
+		w.Write([]byte("401 - No florence token header set!"))
+	}
+	authToken := req.Header.Get(dprequest.FlorenceHeaderKey)
+	if authToken != "Bearer "+testAccessToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("401 - No Authorization token header set!"))
 	}
 }
 

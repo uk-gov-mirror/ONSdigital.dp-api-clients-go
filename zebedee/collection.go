@@ -9,9 +9,9 @@ import (
 )
 
 // GetCollection returns a collection from zebedee.
-func (c *Client) GetCollection(ctx context.Context, userAccessToken, collectionID string) (Collection, error) {
+func (c *Client) GetCollection(ctx context.Context, authToken, collectionID string) (Collection, error) {
 	reqURL := fmt.Sprintf("/collectionDetails/%s", collectionID)
-	b, _, err := c.get(ctx, userAccessToken, reqURL)
+	b, _, err := c.get(ctx, authToken, reqURL)
 
 	if err != nil {
 		return Collection{}, err
@@ -26,7 +26,7 @@ func (c *Client) GetCollection(ctx context.Context, userAccessToken, collectionI
 }
 
 // CreateCollection creates a collection in zebedee and returns it.
-func (c *Client) CreateCollection(ctx context.Context, userAccessToken string, collection Collection) (Collection, error) {
+func (c *Client) CreateCollection(ctx context.Context, authToken string, collection Collection) (Collection, error) {
 	reqURL := "/collection"
 
 	payload, err := json.Marshal(collection)
@@ -34,7 +34,7 @@ func (c *Client) CreateCollection(ctx context.Context, userAccessToken string, c
 		return Collection{}, errors.Wrap(err, "error while attempting to marshall collection")
 	}
 
-	b, _, err := c.post(ctx, userAccessToken, reqURL, payload)
+	b, _, err := c.post(ctx, authToken, reqURL, payload)
 	if err != nil {
 		return Collection{}, err
 	}
@@ -50,10 +50,10 @@ func (c *Client) CreateCollection(ctx context.Context, userAccessToken string, c
 }
 
 // DeleteCollection deletes a collection in zebedee.
-func (c *Client) DeleteCollection(ctx context.Context, userAccessToken, collectionID string) error {
+func (c *Client) DeleteCollection(ctx context.Context, authToken, collectionID string) error {
 	reqURL := fmt.Sprintf("/collection/%s", collectionID)
 
-	_, _, err := c.delete(ctx, userAccessToken, reqURL)
+	_, _, err := c.delete(ctx, authToken, reqURL)
 	if err != nil {
 		return err
 	}
@@ -62,10 +62,10 @@ func (c *Client) DeleteCollection(ctx context.Context, userAccessToken, collecti
 }
 
 // ApproveCollection approves a collection in zebedee.
-func (c *Client) ApproveCollection(ctx context.Context, userAccessToken, collectionID string) error {
+func (c *Client) ApproveCollection(ctx context.Context, authToken, collectionID string) error {
 	reqURL := fmt.Sprintf("/approve/%s", collectionID)
 
-	_, _, err := c.post(ctx, userAccessToken, reqURL, []byte{})
+	_, _, err := c.post(ctx, authToken, reqURL, []byte{})
 	if err != nil {
 		return err
 	}
@@ -74,10 +74,10 @@ func (c *Client) ApproveCollection(ctx context.Context, userAccessToken, collect
 }
 
 // PublishCollection publishes a collection in zebedee.
-func (c *Client) PublishCollection(ctx context.Context, userAccessToken, collectionID string) error {
+func (c *Client) PublishCollection(ctx context.Context, authToken, collectionID string) error {
 	reqURL := fmt.Sprintf("/publish/%s", collectionID)
 
-	_, _, err := c.post(ctx, userAccessToken, reqURL, []byte{})
+	_, _, err := c.post(ctx, authToken, reqURL, []byte{})
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (c *Client) PublishCollection(ctx context.Context, userAccessToken, collect
 
 // SaveContentToCollection saves the provided json content
 // to a collection in zebedee
-func (c *Client) SaveContentToCollection(ctx context.Context, userAccessToken, collectionID, pagePath string, content interface{}) error {
+func (c *Client) SaveContentToCollection(ctx context.Context, authToken, collectionID, pagePath string, content interface{}) error {
 	reqURL := fmt.Sprintf("/content/%s?uri=%s/data.json", collectionID, pagePath)
 
 	payload, err := json.Marshal(content)
@@ -95,7 +95,7 @@ func (c *Client) SaveContentToCollection(ctx context.Context, userAccessToken, c
 		return errors.Wrap(err, "error while attempting to marshall content")
 	}
 
-	_, _, err = c.post(ctx, userAccessToken, reqURL, payload)
+	_, _, err = c.post(ctx, authToken, reqURL, payload)
 	if err != nil {
 		return err
 	}
@@ -105,10 +105,10 @@ func (c *Client) SaveContentToCollection(ctx context.Context, userAccessToken, c
 
 // CompleteCollectionContent marks the content
 // as completed and ready for review in zebedee
-func (c *Client) CompleteCollectionContent(ctx context.Context, userAccessToken, collectionID, lang, pagePath string) error {
+func (c *Client) CompleteCollectionContent(ctx context.Context, authToken, collectionID, lang, pagePath string) error {
 	reqURL := fmt.Sprintf("/complete/%s?uri=%s/%s", collectionID, pagePath, getDataFileForLang(lang))
 
-	_, _, err := c.post(ctx, userAccessToken, reqURL, []byte{})
+	_, _, err := c.post(ctx, authToken, reqURL, []byte{})
 	if err != nil {
 		return err
 	}
@@ -118,10 +118,10 @@ func (c *Client) CompleteCollectionContent(ctx context.Context, userAccessToken,
 
 // ApproveCollectionContent approves the provided json content path
 // in a collection in zebedee
-func (c *Client) ApproveCollectionContent(ctx context.Context, userAccessToken, collectionID, lang, pagePath string) error {
+func (c *Client) ApproveCollectionContent(ctx context.Context, authToken, collectionID, lang, pagePath string) error {
 	reqURL := fmt.Sprintf("/review/%s?uri=%s/%s", collectionID, pagePath, getDataFileForLang(lang))
 
-	_, _, err := c.post(ctx, userAccessToken, reqURL, []byte{})
+	_, _, err := c.post(ctx, authToken, reqURL, []byte{})
 	if err != nil {
 		return err
 	}
@@ -131,10 +131,10 @@ func (c *Client) ApproveCollectionContent(ctx context.Context, userAccessToken, 
 
 // DeleteCollectionContent deletes the content at the provided content path
 // in a collection in zebedee
-func (c *Client) DeleteCollectionContent(ctx context.Context, userAccessToken, collectionID, pagePath string) error {
+func (c *Client) DeleteCollectionContent(ctx context.Context, authToken, collectionID, pagePath string) error {
 	reqURL := fmt.Sprintf("/page/%s?uri=%s", collectionID, pagePath)
 
-	_, _, err := c.delete(ctx, userAccessToken, reqURL)
+	_, _, err := c.delete(ctx, authToken, reqURL)
 	if err != nil {
 		return err
 	}
