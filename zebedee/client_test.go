@@ -1478,3 +1478,17 @@ func TestGetResourceStream(t *testing.T) {
 		})
 	})
 }
+
+func TestErrInvalidZebedeeResponse(t *testing.T) {
+	t.Parallel()
+
+	Convey("ErrInvalidZebedeeResponse exposes status code and formatted message", t, func() {
+		err := ErrInvalidZebedeeResponse{
+			ActualCode: http.StatusNotFound,
+			URI:        "/missing/resource",
+		}
+
+		So(err.Code(), ShouldEqual, http.StatusNotFound)
+		So(err.Error(), ShouldEqual, "invalid response from zebedee: 404, path: /missing/resource")
+	})
+}

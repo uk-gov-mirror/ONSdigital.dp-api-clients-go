@@ -48,6 +48,11 @@ func (e ErrInvalidZebedeeResponse) Error() string {
 	)
 }
 
+// Code returns the actual status code that was returned from zebedee.
+func (e ErrInvalidZebedeeResponse) Code() int {
+	return e.ActualCode
+}
+
 var _ error = ErrInvalidZebedeeResponse{}
 
 // New creates a new Zebedee Client, set
