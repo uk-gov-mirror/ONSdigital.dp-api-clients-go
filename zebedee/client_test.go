@@ -446,20 +446,29 @@ func TestUnitClient(t *testing.T) {
 
 	Convey("test createRequestURL", t, func() {
 		Convey("test collection ID is added to URL when collection ID is passed", func() {
-			url := cli.createRequestURL(ctx, testCollectionID, "", "/data", "uri=/test/path/123")
+			url, err := cli.createRequestURL(ctx, testCollectionID, "", "/data", "uri=/test/path/123")
+			So(err, ShouldBeNil)
 			So(url, ShouldEqual, "/data/test-collection?uri=%2Ftest%2Fpath%2F123")
 		})
 		Convey("test collection ID is not added to URL when empty collection ID is passed", func() {
-			url := cli.createRequestURL(ctx, "", "", "/data", "uri=/test/path/123")
+			url, err := cli.createRequestURL(ctx, "", "", "/data", "uri=/test/path/123")
+			So(err, ShouldBeNil)
 			So(url, ShouldEqual, "/data?uri=%2Ftest%2Fpath%2F123")
 		})
 		Convey("test lang query parameter is added to URL when locale code is passed", func() {
-			url := cli.createRequestURL(ctx, "", "cy", "/data", "uri=/test/path/123")
+			url, err := cli.createRequestURL(ctx, "", "cy", "/data", "uri=/test/path/123")
+			So(err, ShouldBeNil)
 			So(url, ShouldEqual, "/data?uri=%2Ftest%2Fpath%2F123&lang=cy")
 		})
 		Convey("test collection ID and lang query parameter are added to URL when collection ID and locale code are present", func() {
-			url := cli.createRequestURL(ctx, testCollectionID, "cy", "/data", "uri=/test/path/123")
+			url, err := cli.createRequestURL(ctx, testCollectionID, "cy", "/data", "uri=/test/path/123")
+			So(err, ShouldBeNil)
 			So(url, ShouldEqual, "/data/test-collection?uri=%2Ftest%2Fpath%2F123&lang=cy")
+		})
+		Convey("bad test collection ID returns an error", func() {
+			_, err := cli.createRequestURL(ctx, testCollectionBadID, "cy", "/data", "uri=/test/path/123")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldResemble, "invalid collection id")
 		})
 	})
 

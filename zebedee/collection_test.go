@@ -16,8 +16,9 @@ const (
 	endpointCollection        = "/collection"
 	endpointCollectionDetails = "/collectionDetails/"
 
-	testCollectionID = "test-collection"
-	testPagePath     = "some/page"
+	testCollectionID    = "test-collection"
+	testCollectionBadID = "../../v1/something"
+	testPagePath        = "some/page"
 )
 
 func TestClientGetCollection(t *testing.T) {
